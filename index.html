@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>星海战域 - 太空战机</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"Orbitron"', 'sans-serif'],
+          },
+          animation: {
+            'pulse-soft': 'pulse-soft 3s ease-in-out infinite',
+            'twinkle': 'twinkle 6s linear infinite',
+          },
+          keyframes: {
+            'pulse-soft': {
+              '0%, 100%': { opacity: '0.7' },
+              '50%': { opacity: '1' },
+            },
+            twinkle: {
+              '0%': { transform: 'translateY(0)' },
+              '100%': { transform: 'translateY(200px)' },
+            },
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Rajdhani:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-YD7Zxkd06Pq4jG3Ejj6+UeJ8V+RaHcRUW2KIiMzFx6I0X58F3RrgPf63HgFUsVTNff7kwh28ykVfoWHz0z7YwQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <style>
+    body {
+      font-family: 'Rajdhani', sans-serif;
+      background: radial-gradient(circle at top, rgba(33, 82, 255, 0.3), transparent 40%),
+        radial-gradient(circle at 20% 20%, rgba(0, 255, 255, 0.15), transparent 35%),
+        radial-gradient(circle at 80% 30%, rgba(255, 0, 128, 0.2), transparent 40%), #040612;
+      min-height: 100vh;
+    }
+    .glass-panel {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.55), rgba(15, 23, 42, 0.25));
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      box-shadow: 0 20px 40px rgba(2, 6, 23, 0.45);
+      backdrop-filter: blur(18px);
+    }
+    .starfield {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      border-radius: 9999px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.9), rgba(59, 130, 246, 0));
+      opacity: 0.4;
+      animation: blink 4s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%, 100% {
+        opacity: 0.15;
+      }
+      50% {
+        opacity: 0.8;
+      }
+    }
+    .glow-text {
+      text-shadow: 0 0 12px rgba(56, 189, 248, 0.8), 0 0 24px rgba(129, 140, 248, 0.6);
+    }
+    .animate-slide-down {
+      animation: slideDown 0.6s ease;
+    }
+    @keyframes slideDown {
+      from {
+        transform: translateY(-20px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    canvas {
+      image-rendering: optimizeQuality;
+    }
+  </style>
+</head>
+<body class="text-slate-100 overflow-hidden relative">
+  <div id="stars" class="absolute inset-0 pointer-events-none"></div>
+  <div class="relative z-10 w-full max-w-6xl mx-auto px-4 py-8">
+    <div class="flex flex-col lg:flex-row gap-6">
+      <div class="glass-panel rounded-3xl p-6 flex-1 relative overflow-hidden">
+        <div class="absolute inset-0 opacity-20 pointer-events-none" id="nebula"></div>
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h1 class="text-3xl lg:text-4xl font-display font-bold glow-text">星海战域：苍穹之怒</h1>
+            <p class="text-slate-300">驾驶战机穿梭星尘，守护银河防线。</p>
+          </div>
+          <div class="flex gap-2 text-sm text-slate-300">
+            <span class="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/40"><i class="fa-solid fa-keyboard mr-2"></i>支持键鼠</span>
+            <span class="px-3 py-1 rounded-full bg-pink-500/10 border border-pink-400/40"><i class="fa-solid fa-mobile mr-2"></i>移动触控</span>
+          </div>
+        </div>
+        <div class="relative rounded-2xl overflow-hidden border border-slate-700/60 bg-slate-900/40">
+          <canvas id="gameCanvas" class="w-full bg-transparent" width="960" height="540"></canvas>
+          <div id="uiLayer" class="absolute inset-0 pointer-events-none">
+            <div class="flex justify-between px-6 pt-4 text-sm font-semibold font-display">
+              <div class="flex items-center gap-4">
+                <div class="px-4 py-2 rounded-xl bg-slate-900/70 border border-slate-700/80 shadow-lg backdrop-blur">
+                  分数：<span id="score">0</span>
+                </div>
+                <div class="px-4 py-2 rounded-xl bg-slate-900/70 border border-slate-700/80 shadow-lg backdrop-blur">
+                  生命：<span id="lives">3</span>
+                </div>
+                <div class="px-4 py-2 rounded-xl bg-slate-900/70 border border-slate-700/80 shadow-lg backdrop-blur">
+                  关卡：<span id="level">1</span>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <div id="warning" class="px-3 py-2 rounded-xl bg-red-500/30 border border-red-300/50 text-red-100 shadow-lg backdrop-blur hidden">
+                  <i class="fa-solid fa-triangle-exclamation mr-2"></i>敌机突破防线！
+                </div>
+                <div id="levelUpBanner" class="px-3 py-2 rounded-xl bg-emerald-500/30 border border-emerald-300/50 text-emerald-100 shadow-lg backdrop-blur hidden">
+                  <i class="fa-solid fa-jet-fighter-up mr-2"></i>关卡提升！
+                </div>
+              </div>
+            </div>
+            <div id="achievementToast" class="absolute top-24 left-1/2 -translate-x-1/2 px-5 py-3 rounded-2xl bg-indigo-500/40 border border-indigo-300/40 text-indigo-100 font-semibold text-sm shadow-2xl backdrop-blur-lg hidden">
+              <i class="fa-solid fa-award mr-2"></i><span id="achievementText"></span>
+            </div>
+            <div id="pauseOverlay" class="absolute inset-0 bg-slate-950/70 backdrop-blur-xl flex flex-col items-center justify-center gap-6 hidden">
+              <h2 class="text-3xl font-display glow-text">游戏暂停</h2>
+              <div class="flex gap-4">
+                <button id="resumeBtn" class="pointer-events-auto px-6 py-3 rounded-full bg-cyan-500/80 hover:bg-cyan-400 text-slate-950 font-semibold shadow-lg transition-transform transform hover:-translate-y-1">
+                  <i class="fa-solid fa-play mr-2"></i>继续战斗
+                </button>
+                <button id="exitBtn" class="pointer-events-auto px-6 py-3 rounded-full bg-pink-500/80 hover:bg-pink-400 text-slate-950 font-semibold shadow-lg transition-transform transform hover:-translate-y-1">
+                  <i class="fa-solid fa-door-open mr-2"></i>退出任务
+                </button>
+              </div>
+            </div>
+            <div id="startScreen" class="absolute inset-0 flex flex-col items-center justify-center gap-6 bg-slate-950/70 backdrop-blur-xl text-center">
+              <div class="px-6 py-4 rounded-3xl bg-white/5 border border-white/20 shadow-2xl">
+                <h2 class="text-4xl font-display font-bold mb-2 glow-text">星海战域</h2>
+                <p class="text-slate-300 max-w-sm">在深邃宇宙中，敌舰正向前哨推进。操控战机，收集道具，突破愈发严苛的关卡，解锁荣耀成就！</p>
+              </div>
+              <button id="startBtn" class="pointer-events-auto px-8 py-3 rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-500 text-slate-950 font-semibold shadow-xl hover:shadow-2xl transition-all transform hover:scale-105">
+                <i class="fa-solid fa-rocket mr-2"></i>开始任务
+              </button>
+            </div>
+            <div id="gameOverScreen" class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-950/80 backdrop-blur-xl text-center hidden">
+              <div class="px-8 py-6 rounded-3xl bg-white/5 border border-white/20 shadow-2xl max-w-md">
+                <h2 class="text-3xl font-display font-semibold mb-2 text-pink-300">任务结束</h2>
+                <p class="text-slate-200">得分：<span id="finalScore" class="text-cyan-300 font-bold"></span></p>
+                <p class="text-slate-200">达到关卡：<span id="finalLevel" class="text-cyan-300 font-bold"></span></p>
+                <div class="mt-4">
+                  <h3 class="text-lg font-semibold text-indigo-200 mb-2">获得成就</h3>
+                  <ul id="unlockedAchievements" class="space-y-1 text-sm text-slate-300"></ul>
+                </div>
+              </div>
+              <button id="restartBtn" class="pointer-events-auto px-6 py-3 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-semibold shadow-xl hover:shadow-2xl transition-transform transform hover:-translate-y-1">
+                <i class="fa-solid fa-rotate-right mr-2"></i>重新部署
+              </button>
+            </div>
+            <div id="touchControls" class="pointer-events-none absolute inset-0 flex flex-col justify-end p-4 gap-4">
+              <div class="flex justify-between">
+                <div id="touchMoveArea" class="pointer-events-auto w-32 h-32 rounded-full border border-white/30 bg-white/5 backdrop-blur flex items-center justify-center text-xs text-slate-200">滑动操控</div>
+                <div class="flex flex-col gap-3 items-end">
+                  <button id="touchShoot" class="pointer-events-auto w-16 h-16 rounded-full bg-cyan-400/80 text-slate-950 font-bold text-lg shadow-xl border border-white/40">射击</button>
+                  <button id="touchPause" class="pointer-events-auto w-14 h-14 rounded-full bg-white/10 border border-white/30 text-white text-sm shadow-lg"><i class="fa-solid fa-pause"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="glass-panel rounded-3xl p-6 w-full lg:w-80 hidden lg:flex flex-col gap-4 text-sm">
+        <h2 class="text-xl font-display text-cyan-300 flex items-center gap-2"><i class="fa-solid fa-circle-info"></i> 战术指令</h2>
+        <div>
+          <h3 class="font-semibold text-indigo-200 mb-1">操作指南</h3>
+          <ul class="space-y-1 text-slate-300">
+            <li><i class="fa-solid fa-arrow-pointer text-cyan-300 mr-2"></i>方向键 / 触控滑动：移动战机</li>
+            <li><i class="fa-solid fa-space-awesome text-cyan-300 mr-2"></i>空格 / 射击按钮：发射子弹</li>
+            <li><i class="fa-solid fa-p text-cyan-300 mr-2"></i>P 键 / 暂停按钮：暂停游戏</li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="font-semibold text-indigo-200 mb-1">道具说明</h3>
+          <ul class="space-y-1 text-slate-300">
+            <li><span class="text-cyan-300 font-semibold">三向子弹</span>：短时间内一次发射三枚子弹</li>
+            <li><span class="text-emerald-300 font-semibold">能量护盾</span>：立即获得一次防御并产生护盾光环</li>
+          </ul>
+        </div>
+        <div>
+          <h3 class="font-semibold text-indigo-200 mb-1">成就目标</h3>
+          <ul class="space-y-1 text-slate-300">
+            <li>第一滴血：击毁第一架敌机</li>
+            <li>生存者：坚持到关卡 5</li>
+            <li>火力全开：使用三向子弹击毁 10 架敌机</li>
+            <li>守护者：护盾抵挡一次攻击</li>
+            <li>绝地反击：生命仅剩 1 时取得 800 分</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const ui = {
+      score: document.getElementById('score'),
+      lives: document.getElementById('lives'),
+      level: document.getElementById('level'),
+      warning: document.getElementById('warning'),
+      levelUpBanner: document.getElementById('levelUpBanner'),
+      achievementToast: document.getElementById('achievementToast'),
+      achievementText: document.getElementById('achievementText'),
+      pauseOverlay: document.getElementById('pauseOverlay'),
+      gameOverScreen: document.getElementById('gameOverScreen'),
+      startScreen: document.getElementById('startScreen'),
+      finalScore: document.getElementById('finalScore'),
+      finalLevel: document.getElementById('finalLevel'),
+      unlockedAchievements: document.getElementById('unlockedAchievements'),
+    };
+    const buttons = {
+      start: document.getElementById('startBtn'),
+      restart: document.getElementById('restartBtn'),
+      resume: document.getElementById('resumeBtn'),
+      exit: document.getElementById('exitBtn'),
+      touchShoot: document.getElementById('touchShoot'),
+      touchPause: document.getElementById('touchPause'),
+    };
+
+    const touchControl = {
+      area: document.getElementById('touchMoveArea'),
+      active: false,
+      identifier: null,
+      origin: { x: 0, y: 0 },
+      vector: { x: 0, y: 0 },
+    };
+
+    let width = canvas.clientWidth;
+    let height = canvas.clientHeight;
+
+    function resizeCanvas() {
+      const ratio = 16 / 9;
+      const availableWidth = canvas.parentElement.clientWidth;
+      let calcWidth = availableWidth;
+      let calcHeight = calcWidth / ratio;
+      if (calcHeight > window.innerHeight * 0.7) {
+        calcHeight = window.innerHeight * 0.7;
+        calcWidth = calcHeight * ratio;
+      }
+      canvas.width = calcWidth;
+      canvas.height = calcHeight;
+      width = canvas.width;
+      height = canvas.height;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    class Entity {
+      constructor(x, y, width, height) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+      }
+      draw(ctx) {}
+      update(delta) {}
+      get centerX() {
+        return this.x + this.width / 2;
+      }
+      get centerY() {
+        return this.y + this.height / 2;
+      }
+    }
+
+    class Player extends Entity {
+      constructor() {
+        super(width / 2 - 24, height - 100, 48, 64);
+        this.speed = 340;
+        this.color = '#38bdf8';
+        this.cooldown = 0;
+        this.fireRate = 0.22;
+        this.tripleShot = 0;
+        this.lives = 3;
+        this.invincible = 0;
+        this.shield = false;
+        this.hitFlash = 0;
+      }
+      reset() {
+        this.x = width / 2 - this.width / 2;
+        this.y = height - 100;
+        this.cooldown = 0;
+        this.tripleShot = 0;
+        this.invincible = 0;
+        this.shield = false;
+        this.hitFlash = 0;
+        this.lives = 3;
+      }
+      draw(ctx) {
+        ctx.save();
+        ctx.translate(this.centerX, this.centerY);
+        if (this.invincible > 0) {
+          const alpha = 0.6 + Math.sin(Date.now() * 0.02) * 0.2;
+          ctx.globalAlpha = Math.max(0.4, Math.min(1, alpha));
+        }
+        const gradient = ctx.createLinearGradient(-this.width / 2, -this.height / 2, this.width / 2, this.height / 2);
+        gradient.addColorStop(0, 'rgba(56, 189, 248, 0.9)');
+        gradient.addColorStop(1, 'rgba(165, 180, 252, 0.8)');
+        ctx.fillStyle = gradient;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = 'rgba(56, 189, 248, 0.9)';
+        ctx.beginPath();
+        ctx.moveTo(0, -this.height / 2);
+        ctx.lineTo(this.width / 2, this.height / 2);
+        ctx.lineTo(0, this.height / 4);
+        ctx.lineTo(-this.width / 2, this.height / 2);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(14, 116, 144, 0.9)';
+        ctx.fillRect(-5, this.height / 4, 10, this.height / 3);
+
+        ctx.fillStyle = 'rgba(244, 114, 182, 0.8)';
+        ctx.fillRect(-this.width / 6, -this.height / 6, this.width / 3, this.height / 8);
+
+        if (this.shield) {
+          ctx.strokeStyle = 'rgba(125, 211, 252, 0.7)';
+          ctx.lineWidth = 4;
+          ctx.shadowBlur = 25;
+          ctx.shadowColor = 'rgba(96, 165, 250, 0.9)';
+          ctx.beginPath();
+          ctx.arc(0, 0, this.width * 0.8, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        if (this.hitFlash > 0) {
+          ctx.fillStyle = 'rgba(248, 250, 252, 0.45)';
+          ctx.beginPath();
+          ctx.arc(0, 0, this.width, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      update(delta, input) {
+        let moveX = 0;
+        let moveY = 0;
+        if (input.left) moveX -= 1;
+        if (input.right) moveX += 1;
+        if (input.up) moveY -= 1;
+        if (input.down) moveY += 1;
+        if (touchControl.active) {
+          moveX += touchControl.vector.x;
+          moveY += touchControl.vector.y;
+        }
+        if (moveX !== 0 || moveY !== 0) {
+          const length = Math.hypot(moveX, moveY);
+          moveX /= length || 1;
+          moveY /= length || 1;
+        }
+        this.x += moveX * this.speed * delta;
+        this.y += moveY * this.speed * delta;
+        this.x = Math.max(0, Math.min(width - this.width, this.x));
+        this.y = Math.max(0, Math.min(height - this.height, this.y));
+        this.cooldown -= delta;
+        this.tripleShot = Math.max(0, this.tripleShot - delta);
+        this.invincible = Math.max(0, this.invincible - delta);
+        this.hitFlash = Math.max(0, this.hitFlash - delta);
+      }
+      canShoot() {
+        return this.cooldown <= 0;
+      }
+      shoot() {
+        this.cooldown = this.fireRate;
+      }
+    }
+
+    class Bullet extends Entity {
+      constructor(x, y, dx, dy, speed, friendly = true) {
+        super(x, y, 6, 18);
+        this.dx = dx;
+        this.dy = dy;
+        this.speed = speed;
+        this.friendly = friendly;
+        this.color = friendly ? 'rgba(165, 243, 252, 0.9)' : 'rgba(248, 113, 113, 0.9)';
+      }
+      update(delta) {
+        this.x += this.dx * this.speed * delta;
+        this.y += this.dy * this.speed * delta;
+      }
+      draw(ctx) {
+        ctx.save();
+        ctx.translate(this.centerX, this.centerY);
+        ctx.rotate(Math.atan2(this.dy, this.dx) + Math.PI / 2);
+        const grad = ctx.createLinearGradient(0, -this.height / 2, 0, this.height / 2);
+        grad.addColorStop(0, this.color);
+        grad.addColorStop(1, 'rgba(14, 165, 233, 0.1)');
+        ctx.fillStyle = grad;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = this.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -this.height / 2);
+        ctx.lineTo(this.width / 2, this.height / 2);
+        ctx.lineTo(-this.width / 2, this.height / 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    class Enemy extends Entity {
+      constructor(type, x, y, speed, hp, score, color) {
+        super(x, y, 44, 44);
+        this.type = type;
+        this.speed = speed;
+        this.hp = hp;
+        this.maxHp = hp;
+        this.score = score;
+        this.color = color;
+        this.shootCooldown = 2 + Math.random();
+      }
+      update(delta) {
+        this.y += this.speed * delta;
+        this.shootCooldown -= delta;
+      }
+      draw(ctx) {
+        ctx.save();
+        ctx.translate(this.centerX, this.centerY);
+        const gradient = ctx.createLinearGradient(-this.width / 2, -this.height / 2, this.width / 2, this.height / 2);
+        gradient.addColorStop(0, this.color);
+        gradient.addColorStop(1, 'rgba(100, 116, 139, 0.5)');
+        ctx.fillStyle = gradient;
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = this.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -this.height / 2);
+        ctx.lineTo(this.width / 2, 0);
+        ctx.lineTo(0, this.height / 2);
+        ctx.lineTo(-this.width / 2, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(248, 250, 252, 0.6)';
+        ctx.fillRect(-6, -this.height / 4, 12, this.height / 2);
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
+        ctx.beginPath();
+        ctx.arc(0, -this.height / 6, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.width / 2.2, 0, Math.PI * 2);
+        ctx.stroke();
+
+        const hpRatio = this.hp / this.maxHp;
+        ctx.fillStyle = 'rgba(248, 113, 113, 0.8)';
+        ctx.fillRect(-this.width / 2, this.height / 2 + 6, this.width, 6);
+        ctx.fillStyle = 'rgba(134, 239, 172, 0.9)';
+        ctx.fillRect(-this.width / 2, this.height / 2 + 6, this.width * hpRatio, 6);
+        ctx.restore();
+      }
+    }
+
+    class PowerUp extends Entity {
+      constructor(type, x, y) {
+        super(x, y, 36, 36);
+        this.type = type;
+        this.speed = 110;
+        this.glow = type === 'triple' ? 'rgba(56, 189, 248, 0.8)' : 'rgba(134, 239, 172, 0.8)';
+      }
+      update(delta) {
+        this.y += this.speed * delta;
+      }
+      draw(ctx) {
+        ctx.save();
+        ctx.translate(this.centerX, this.centerY);
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = this.glow;
+        ctx.fillStyle = this.glow;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.width / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+        if (this.type === 'triple') {
+          ctx.beginPath();
+          ctx.moveTo(0, -8);
+          ctx.lineTo(10, 10);
+          ctx.lineTo(-10, 10);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = 'rgba(226, 232, 240, 0.8)';
+          ctx.beginPath();
+          ctx.arc(0, 0, 10, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+    }
+
+    class Particle {
+      constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.life = 0.6;
+        this.size = Math.random() * 6 + 4;
+        this.velocityX = (Math.random() - 0.5) * 300;
+        this.velocityY = (Math.random() - 0.5) * 300;
+        this.color = color;
+      }
+      update(delta) {
+        this.life -= delta;
+        this.x += this.velocityX * delta;
+        this.y += this.velocityY * delta;
+      }
+      draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(this.life / 0.6, 0);
+        const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
+        gradient.addColorStop(0, this.color);
+        gradient.addColorStop(1, 'rgba(15, 23, 42, 0)');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    const game = {
+      state: 'idle',
+      score: 0,
+      level: 1,
+      enemyTimer: 0,
+      enemyInterval: 1.6,
+      player: new Player(),
+      bullets: [],
+      enemyBullets: [],
+      enemies: [],
+      powerUps: [],
+      particles: [],
+      input: { left: false, right: false, up: false, down: false, shoot: false },
+      achievements: {
+        firstBlood: { unlocked: false, label: '第一滴血：击毁第一架敌机' },
+        survivor: { unlocked: false, label: '生存者：达到关卡 5' },
+        triMaster: { unlocked: false, label: '火力全开：三向火力击毁 10 架敌机' },
+        guardian: { unlocked: false, label: '守护者：护盾抵挡一次攻击' },
+        comeback: { unlocked: false, label: '绝地反击：生命剩 1 时得分超过 800' },
+      },
+      triShotKills: 0,
+      comboTimer: 0,
+      paused: false,
+      levelCleared: false,
+    };
+
+    let lastTime = 0;
+
+    function resetGame() {
+      game.score = 0;
+      game.level = 1;
+      game.enemyTimer = 0;
+      game.enemyInterval = 1.6;
+      game.bullets = [];
+      game.enemyBullets = [];
+      game.enemies = [];
+      game.powerUps = [];
+      game.particles = [];
+      game.player.reset();
+      game.input.shoot = false;
+      game.state = 'playing';
+      game.paused = false;
+      game.levelCleared = false;
+      game.triShotKills = 0;
+      Object.values(game.achievements).forEach((ach) => (ach.unlocked = false));
+      ui.score.textContent = game.score;
+      ui.lives.textContent = game.player.lives;
+      ui.level.textContent = game.level;
+      ui.warning.classList.add('hidden');
+      hideElement(ui.gameOverScreen);
+      hideElement(ui.levelUpBanner);
+      hideElement(ui.achievementToast);
+    }
+
+    function hideElement(element) {
+      element.classList.add('hidden');
+    }
+    function showElement(element) {
+      element.classList.remove('hidden');
+    }
+
+    function spawnEnemy() {
+      const types = [
+        {
+          type: 'basic',
+          speed: 70 + game.level * 10,
+          hp: 1,
+          score: 40,
+          color: 'rgba(96, 165, 250, 0.9)',
+        },
+        {
+          type: 'fast',
+          speed: 120 + game.level * 12,
+          hp: 1,
+          score: 55,
+          color: 'rgba(251, 191, 36, 0.9)',
+        },
+        {
+          type: 'heavy',
+          speed: 50 + game.level * 8,
+          hp: 3,
+          score: 120,
+          color: 'rgba(248, 113, 113, 0.9)',
+        },
+      ];
+      const variant = types[Math.floor(Math.random() * types.length)];
+      const x = Math.random() * (width - 60) + 30;
+      const enemy = new Enemy(variant.type, x, -50, variant.speed, variant.hp, variant.score, variant.color);
+      game.enemies.push(enemy);
+    }
+
+    function spawnPowerUp(x, y) {
+      const type = Math.random() < 0.55 ? 'triple' : 'shield';
+      const powerUp = new PowerUp(type, x - 18, y);
+      game.powerUps.push(powerUp);
+    }
+
+    function createExplosion(x, y, color = 'rgba(251, 191, 36, 0.9)') {
+      for (let i = 0; i < 16; i++) {
+        game.particles.push(new Particle(x, y, color));
+      }
+    }
+
+    function update(delta) {
+      if (game.state !== 'playing' || game.paused) return;
+      const player = game.player;
+      player.update(delta, game.input);
+      if ((game.input.shoot || touchShootPressed) && player.canShoot()) {
+        player.shoot();
+        const bulletSpeed = 460;
+        if (player.tripleShot > 0) {
+          game.bullets.push(new Bullet(player.x + player.width / 2 - 3, player.y - 20, 0, -1, bulletSpeed));
+          game.bullets.push(new Bullet(player.x + player.width / 2 - 3, player.y - 20, -0.35, -1, bulletSpeed));
+          game.bullets.push(new Bullet(player.x + player.width / 2 - 3, player.y - 20, 0.35, -1, bulletSpeed));
+        } else {
+          game.bullets.push(new Bullet(player.x + player.width / 2 - 3, player.y - 20, 0, -1, bulletSpeed));
+        }
+      }
+
+      for (let i = game.bullets.length - 1; i >= 0; i--) {
+        const bullet = game.bullets[i];
+        bullet.update(delta);
+        if (bullet.y < -40 || bullet.y > height + 40 || bullet.x < -40 || bullet.x > width + 40) {
+          game.bullets.splice(i, 1);
+        }
+      }
+
+      for (let i = game.enemyBullets.length - 1; i >= 0; i--) {
+        const bullet = game.enemyBullets[i];
+        bullet.update(delta);
+        if (bullet.y > height + 40) {
+          game.enemyBullets.splice(i, 1);
+        }
+      }
+
+      game.enemyTimer -= delta;
+      if (game.enemyTimer <= 0) {
+        spawnEnemy();
+        const difficultyFactor = Math.max(0.55, 1.6 - game.level * 0.1);
+        game.enemyInterval = difficultyFactor;
+        game.enemyTimer = game.enemyInterval;
+      }
+
+      for (let i = game.enemies.length - 1; i >= 0; i--) {
+        const enemy = game.enemies[i];
+        enemy.update(delta);
+        if (enemy.shootCooldown <= 0) {
+          game.enemyBullets.push(new Bullet(enemy.centerX - 3, enemy.centerY + enemy.height / 2, 0, 1, 180, false));
+          enemy.shootCooldown = 2.5 - Math.min(game.level * 0.1, 1.5) + Math.random();
+        }
+        if (enemy.y > height + 40) {
+          game.enemies.splice(i, 1);
+          game.score = Math.max(0, game.score - 80);
+          showWarning();
+          ui.score.textContent = game.score;
+        }
+      }
+
+      for (let i = game.powerUps.length - 1; i >= 0; i--) {
+        const power = game.powerUps[i];
+        power.update(delta);
+        if (power.y > height + 40) {
+          game.powerUps.splice(i, 1);
+        }
+      }
+
+      for (let i = game.particles.length - 1; i >= 0; i--) {
+        const particle = game.particles[i];
+        particle.update(delta);
+        if (particle.life <= 0) {
+          game.particles.splice(i, 1);
+        }
+      }
+
+      handleCollisions();
+      checkLevelUp();
+      checkAchievements();
+    }
+
+    function handleCollisions() {
+      const player = game.player;
+      for (let i = game.enemies.length - 1; i >= 0; i--) {
+        const enemy = game.enemies[i];
+        for (let j = game.bullets.length - 1; j >= 0; j--) {
+          const bullet = game.bullets[j];
+          if (bullet.friendly && rectOverlap(bullet, enemy)) {
+            game.bullets.splice(j, 1);
+            enemy.hp -= 1;
+            if (player.tripleShot > 0) {
+              game.triShotKills += 1;
+            }
+            createExplosion(bullet.centerX, bullet.centerY, 'rgba(190, 242, 100, 0.8)');
+            if (enemy.hp <= 0) {
+              game.enemies.splice(i, 1);
+              game.score += enemy.score;
+              ui.score.textContent = game.score;
+              createExplosion(enemy.centerX, enemy.centerY, 'rgba(251, 191, 36, 0.9)');
+              if (Math.random() < 0.12) {
+                spawnPowerUp(enemy.centerX, enemy.centerY);
+              }
+              unlockAchievement('firstBlood');
+            }
+            break;
+          }
+        }
+      }
+
+      for (let i = game.enemyBullets.length - 1; i >= 0; i--) {
+        const bullet = game.enemyBullets[i];
+        if (rectOverlap(bullet, player)) {
+          game.enemyBullets.splice(i, 1);
+          playerHit();
+        }
+      }
+
+      for (let i = game.enemies.length - 1; i >= 0; i--) {
+        const enemy = game.enemies[i];
+        if (rectOverlap(enemy, player)) {
+          game.enemies.splice(i, 1);
+          createExplosion(enemy.centerX, enemy.centerY, 'rgba(248, 113, 113, 0.8)');
+          playerHit();
+        }
+      }
+
+      for (let i = game.powerUps.length - 1; i >= 0; i--) {
+        const power = game.powerUps[i];
+        if (rectOverlap(power, player)) {
+          game.powerUps.splice(i, 1);
+          if (power.type === 'triple') {
+            game.player.tripleShot = 8;
+            showAchievementToast('三向火力已激活！');
+          } else {
+            game.player.shield = true;
+            unlockAchievement('guardian');
+            showAchievementToast('护盾能量已充盈！');
+          }
+          createExplosion(power.centerX, power.centerY, power.glow);
+        }
+      }
+    }
+
+    function rectOverlap(a, b) {
+      return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+    }
+
+    function playerHit() {
+      const player = game.player;
+      if (player.invincible > 0) return;
+      if (player.shield) {
+        player.shield = false;
+        player.invincible = 1.2;
+        player.hitFlash = 0.6;
+        createExplosion(player.centerX, player.centerY, 'rgba(165, 243, 252, 0.9)');
+        unlockAchievement('guardian');
+        return;
+      }
+      player.lives -= 1;
+      player.invincible = 1.2;
+      player.hitFlash = 0.6;
+      ui.lives.textContent = player.lives;
+      if (player.lives <= 0) {
+        endGame();
+      }
+    }
+
+    function checkLevelUp() {
+      const targetScore = game.level * 600;
+      if (game.score >= targetScore) {
+        game.level += 1;
+        ui.level.textContent = game.level;
+        showLevelUp();
+        game.enemies.length = 0;
+        game.enemyBullets.length = 0;
+        unlockAchievement('survivor', game.level >= 5);
+      }
+    }
+
+    function checkAchievements() {
+      if (!game.achievements.triMaster.unlocked && game.triShotKills >= 10) {
+        unlockAchievement('triMaster');
+      }
+      if (!game.achievements.comeback.unlocked && game.player.lives === 1 && game.score >= 800) {
+        unlockAchievement('comeback');
+      }
+    }
+
+    function unlockAchievement(key, condition = true) {
+      const achievement = game.achievements[key];
+      if (!achievement || achievement.unlocked || !condition) return;
+      achievement.unlocked = true;
+      showAchievementToast(achievement.label);
+    }
+
+    let toastTimeout;
+    function showAchievementToast(message) {
+      clearTimeout(toastTimeout);
+      ui.achievementText.textContent = message;
+      ui.achievementToast.classList.remove('hidden');
+      ui.achievementToast.classList.add('animate-slide-down');
+      toastTimeout = setTimeout(() => {
+        ui.achievementToast.classList.add('hidden');
+      }, 3000);
+    }
+
+    function showWarning() {
+      ui.warning.classList.remove('hidden');
+      setTimeout(() => ui.warning.classList.add('hidden'), 1200);
+    }
+
+    function showLevelUp() {
+      ui.levelUpBanner.classList.remove('hidden');
+      setTimeout(() => ui.levelUpBanner.classList.add('hidden'), 1500);
+    }
+
+    function endGame() {
+      game.state = 'over';
+      ui.finalScore.textContent = game.score;
+      ui.finalLevel.textContent = game.level;
+      ui.unlockedAchievements.innerHTML = '';
+      Object.values(game.achievements)
+        .filter((ach) => ach.unlocked)
+        .forEach((ach) => {
+          const li = document.createElement('li');
+          li.textContent = ach.label;
+          ui.unlockedAchievements.appendChild(li);
+        });
+      showElement(ui.gameOverScreen);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, width, height);
+      drawBackground();
+      game.player.draw(ctx);
+      game.enemies.forEach((enemy) => enemy.draw(ctx));
+      game.bullets.forEach((bullet) => bullet.draw(ctx));
+      game.enemyBullets.forEach((bullet) => bullet.draw(ctx));
+      game.powerUps.forEach((power) => power.draw(ctx));
+      game.particles.forEach((particle) => particle.draw(ctx));
+    }
+
+    function drawBackground() {
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, 'rgba(15, 23, 42, 0.6)');
+      gradient.addColorStop(1, 'rgba(2, 6, 23, 0.8)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = 'rgba(148, 163, 184, 0.08)';
+      for (let i = 0; i < 60; i++) {
+        const x = (Date.now() * 0.02 + (i * 193)) % width;
+        const y = (i * 73 + Date.now() * 0.015) % height;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.2 + (i % 3), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function loop(timestamp) {
+      const delta = Math.min((timestamp - lastTime) / 1000, 0.05);
+      lastTime = timestamp;
+      update(delta);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    function togglePause() {
+      if (game.state !== 'playing') return;
+      game.paused = !game.paused;
+      if (game.paused) {
+        showElement(ui.pauseOverlay);
+      } else {
+        hideElement(ui.pauseOverlay);
+      }
+    }
+
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') game.input.left = true;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') game.input.right = true;
+      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') game.input.up = true;
+      if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') game.input.down = true;
+      if (e.code === 'Space') {
+        game.input.shoot = true;
+      }
+      if (e.key === 'p' || e.key === 'P') {
+        togglePause();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') game.input.left = false;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') game.input.right = false;
+      if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') game.input.up = false;
+      if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') game.input.down = false;
+      if (e.code === 'Space') {
+        game.input.shoot = false;
+      }
+    });
+
+    buttons.start.addEventListener('click', () => {
+      hideElement(ui.startScreen);
+      resetGame();
+    });
+
+    buttons.restart.addEventListener('click', () => {
+      hideElement(ui.gameOverScreen);
+      resetGame();
+    });
+
+    buttons.resume.addEventListener('click', () => {
+      game.paused = false;
+      hideElement(ui.pauseOverlay);
+    });
+
+    buttons.exit.addEventListener('click', () => {
+      hideElement(ui.pauseOverlay);
+      showElement(ui.startScreen);
+      game.state = 'idle';
+    });
+
+    buttons.touchPause.addEventListener('click', () => {
+      togglePause();
+    });
+
+    let touchShootPressed = false;
+    buttons.touchShoot.addEventListener('touchstart', (e) => {
+      touchShootPressed = true;
+      e.preventDefault();
+    });
+    buttons.touchShoot.addEventListener('touchend', (e) => {
+      touchShootPressed = false;
+      e.preventDefault();
+    });
+    buttons.touchShoot.addEventListener('mousedown', () => {
+      touchShootPressed = true;
+    });
+    buttons.touchShoot.addEventListener('mouseup', () => {
+      touchShootPressed = false;
+    });
+
+    touchControl.area.addEventListener('touchstart', (e) => {
+      const touch = e.changedTouches[0];
+      touchControl.active = true;
+      touchControl.identifier = touch.identifier;
+      touchControl.origin = { x: touch.clientX, y: touch.clientY };
+      touchControl.vector = { x: 0, y: 0 };
+      e.preventDefault();
+    });
+
+    touchControl.area.addEventListener('touchmove', (e) => {
+      const touch = [...e.changedTouches].find((t) => t.identifier === touchControl.identifier);
+      if (!touch) return;
+      const dx = touch.clientX - touchControl.origin.x;
+      const dy = touch.clientY - touchControl.origin.y;
+      const maxDist = 60;
+      touchControl.vector.x = Math.max(-1, Math.min(1, dx / maxDist));
+      touchControl.vector.y = Math.max(-1, Math.min(1, dy / maxDist));
+      e.preventDefault();
+    });
+
+    touchControl.area.addEventListener('touchend', (e) => {
+      const touch = [...e.changedTouches].find((t) => t.identifier === touchControl.identifier);
+      if (!touch) return;
+      touchControl.active = false;
+      touchControl.identifier = null;
+      touchControl.vector = { x: 0, y: 0 };
+      e.preventDefault();
+    });
+
+    touchControl.area.addEventListener('mousedown', (e) => {
+      touchControl.active = true;
+      touchControl.origin = { x: e.clientX, y: e.clientY };
+      touchControl.vector = { x: 0, y: 0 };
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!touchControl.active) return;
+      const dx = e.clientX - touchControl.origin.x;
+      const dy = e.clientY - touchControl.origin.y;
+      const maxDist = 80;
+      touchControl.vector.x = Math.max(-1, Math.min(1, dx / maxDist));
+      touchControl.vector.y = Math.max(-1, Math.min(1, dy / maxDist));
+    });
+    window.addEventListener('mouseup', () => {
+      touchControl.active = false;
+      touchControl.vector = { x: 0, y: 0 };
+    });
+
+    window.addEventListener('blur', () => {
+      if (game.state === 'playing') {
+        game.paused = true;
+        showElement(ui.pauseOverlay);
+      }
+    });
+
+    requestAnimationFrame(loop);
+
+    const starContainer = document.getElementById('stars');
+    for (let i = 0; i < 160; i++) {
+      const star = document.createElement('div');
+      star.className = 'starfield';
+      const size = Math.random() * 2 + 1;
+      star.style.width = `${size}px`;
+      star.style.height = `${size}px`;
+      star.style.top = `${Math.random() * 100}%`;
+      star.style.left = `${Math.random() * 100}%`;
+      star.style.animationDelay = `${Math.random() * 10}s`;
+      starContainer.appendChild(star);
+    }
+
+    const nebula = document.getElementById('nebula');
+    nebula.innerHTML = `<svg width="100%" height="100%" viewBox="0 0 600 400" preserveAspectRatio="none">
+      <defs>
+        <radialGradient id="g1" cx="50%" cy="30%" r="60%">
+          <stop offset="0%" stop-color="rgba(56, 189, 248, 0.35)" />
+          <stop offset="100%" stop-color="rgba(56, 189, 248, 0)" />
+        </radialGradient>
+        <radialGradient id="g2" cx="20%" cy="60%" r="50%">
+          <stop offset="0%" stop-color="rgba(236, 72, 153, 0.35)" />
+          <stop offset="100%" stop-color="rgba(236, 72, 153, 0)" />
+        </radialGradient>
+        <radialGradient id="g3" cx="80%" cy="50%" r="45%">
+          <stop offset="0%" stop-color="rgba(129, 140, 248, 0.4)" />
+          <stop offset="100%" stop-color="rgba(129, 140, 248, 0)" />
+        </radialGradient>
+      </defs>
+      <circle cx="120" cy="140" r="160" fill="url(#g1)">
+        <animate attributeName="r" values="140;180;140" dur="12s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="300" cy="260" r="150" fill="url(#g2)">
+        <animate attributeName="r" values="130;200;130" dur="16s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="480" cy="200" r="140" fill="url(#g3)">
+        <animate attributeName="r" values="120;190;120" dur="14s" repeatCount="indefinite" />
+      </circle>
+    </svg>`;
+  </script>
+</body>
+</html>
